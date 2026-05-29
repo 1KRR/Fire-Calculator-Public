@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Retirement Scenario Calculator</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        .container { display: flex; width: 100%; max-width: 1900px; gap: 10px; }
+        .panel { background: #fff; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .sidebar { width: 180px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+        .main { flex-grow: 1; overflow-x: auto; }
+        h2 { margin-top: 0; font-size: 1rem; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 4px; color: #111;}
+        label { display: block; font-size: 0.7rem; font-weight: bold; margin-bottom: 2px; color: #444; }
+        input[type="number"] { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: monospace; font-size: 0.75rem; margin-bottom: 4px;}
+        .checkbox-label { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.75rem; color: #0056b3; font-weight: bold;}
+        input[type="checkbox"] { cursor: pointer; }
+        button { background-color: #0056b3; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 4px; font-size: 0.85rem;}
+        button:hover { background-color: #004494; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+        th, td { padding: 5px 6px; border-bottom: 1px solid #ddd; text-align: right; white-space: nowrap;}
+        th { background-color: #f8f9fa; font-weight: bold; color: #222; border-bottom: 2px solid #ccc;}
+        th:first-child, td:first-child { text-align: left; }
+        .negative { color: #d9534f; font-weight: bold;}
+        .positive { color: #28a745; }
+        .info-text { font-size: 0.65rem; color: #0056b3; margin-top: 2px; line-height: 1.2; font-weight: bold;}
+        .row-group { margin-bottom: 4px; border-bottom: 1px dashed #eee; padding-bottom: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sidebar panel">
+        <h2>Parameters</h2>
+        
+        <div class="row-group">
+            <label>Current Age</label>
+            <input type="number" id="startAge" value="38">
+            <label>Life Expectancy</label>
+            <input type="number" id="lifeExpectancy" value="90">
+        </div>
+        
+        <div class="row-group">
+            <label>Stop High Income Age</label>
+            <input type="number" id="stopHighAge" value="48">
+            <label>Full Retire Age</label>
+            <input type="number" id="fullRetireAge" value="55">
+        </div>
+
+        <div class="row-group">
+            <label>Coast/Barista Income</label>
+            <input type="number" id="coastIncome" value="50000">
+        </div>
+
+        <div class="row-group">
+            <label>Pension Asset Inflow ($)</label>
+            <input type="number" id="pensionInflow" value="0">
+            <label>Pension Inflow Age</label>
+            <input type="number" id="pensionAge" value="55">
+        </div>
+
+        <div class="row-group">
+            <label>Social Security ($/yr)</label>
+            <input type="number" id="ssIncome" value="0">
+            <label>Social Security Age</label>
+            <input type="number" id="ssAge" value="67">
+        </div>
+
+        <div class="row-group">
+            <label>Target Roth Conv. ($)</label>
+            <input type="number" id="targetConv" value="100000">
+            <label>Stop Roth Conv. Age</label>
+            <input type="number" id="stopConvAge" value="60">
+        </div>
+
+        <div class="row-group">
+            <label>Living Spend (< 55)</label>
+            <input type="number" id="spendHigh" value="100000">
+            <label>Living Spend (>= 55)</label>
+            <input type="number" id="spendLow" value="90000">
+        </div>
+
+        <div class="row-group">
+            <label>Real Return Rate</label>
+            <input type="number" step="0.001" id="rate" value="0.065">
+            <div class="info-text">*Calculated via 2026 MFJ Progressive Brackets & $32,200 Std. Deduction.</div>
+        </div>
+
+        <div class="row-group">
+            <label>Start Trad/401k</label>
+            <input type="number" id="initTrad" value="777090">
+            <label>Start Roth IRA</label>
+            <input type="number" id="initRoth" value="18527">
+            <label>Start Brokerage</label>
+            <input type="number" id="initBrok" value="21332">
+        </div>
+
+        <div class="row-group">
+            <label>Annual 401k</label>
+            <input type="number" id="cont401k" value="34000">
+            <label>Annual Roth Contrib</label>
+            <input type="number" id="contRoth" value="7500">
+            <label>Annual Brok Contrib</label>
+            <input type="number" id="contBrok" value="18000">
+        </div>
+
+        <div class="row-group" style="margin-top: 10px;">
+            <label class="checkbox-label" title="Allows penalty-free withdrawals from your 401k starting at age 55.">
+                <input type="checkbox" id="ruleOf55"> Enable Rule of 55 
+            </label>
+        </div>
+
+        <button onclick="runSimulation()">Run Projection</button>
+    </div>
+
+    <div class="main panel">
+        <h2>Portfolio Projection</h2>
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>Age</th>
+                    <th>Phase</th>
+                    <th>Trad/401k</th>
+                    <th>Roth IRA</th>
+                    <th>Brokerage</th>
+                    <th>Net Worth</th>
+                    <th>Req. SWR</th>
+                    <th>Social Security</th>
+                    <th>Roth Conv.</th>
+                    <th>Brok Draw</th>
+                    <th>Trad Draw</th>
+                    <th>Roth Draw</th>
+                    <th>Fed Tax Paid</th>
+                    <th>Penalties</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const ultFactors = { 
+        75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 
+        81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 
+        87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 
+        93: 10.1, 94: 9.5 
+    };
+
+    function getRsuTa(year) {
+        let extra = 0;
+        if (year === 2026) extra += 53 * 115;
+        if (year === 2027) extra += (53 * 115) + 15000;
+        if (year === 2028) extra += 53 * 115;
+        return extra;
+    }
+
+    function formatCurrency(num) {
+        return Math.round(num).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    }
+
+    // Standard progressive tax without SS combined logic
+    function calculateTax(income) {
+        let taxable = Math.max(0, income - 32200); 
+        let tax = 0;
+        let previousMax = 0;
+        const brackets = [
+            { rate: 0.10, max: 24800 },
+            { rate: 0.12, max: 100800 },
+            { rate: 0.22, max: 211400 },
+            { rate: 0.24, max: 403550 },
+            { rate: 0.32, max: 512450 },
+            { rate: 0.35, max: 768700 },
+            { rate: 0.37, max: Infinity }
+        ];
+        for (let b of brackets) {
+            if (taxable > previousMax) {
+                let amountInBracket = Math.min(taxable, b.max) - previousMax;
+                tax += amountInBracket * b.rate;
+                previousMax = b.max;
+            } else {
+                break;
+            }
+        }
+        return tax;
+    }
+
+    // Calculates taxable portion of SS based on AGI
+    function getTaxableSS(ordinary_income, ss_benefit) {
+        if (ss_benefit <= 0) return 0;
+        let combined_income = ordinary_income + (0.5 * ss_benefit);
+        let taxable_ss = 0;
+        
+        if (combined_income > 44000) {
+            taxable_ss = (0.5 * 12000) + (0.85 * (combined_income - 44000));
+        } else if (combined_income > 32000) {
+            taxable_ss = 0.5 * (combined_income - 32000);
+        }
+        
+        return Math.min(taxable_ss, 0.85 * ss_benefit);
+    }
+
+    // Merges ordinary AGI and taxable SS
+    function getTotalTax(ordinary_income, ss_benefit) {
+        let taxable_ss = getTaxableSS(ordinary_income, ss_benefit);
+        return calculateTax(ordinary_income + taxable_ss);
+    }
+
+    function getGrossDraw(baseIncome, ss_benefit, netNeeded, penaltyRate = 0) {
+        if (netNeeded <= 0) return 0;
+        let low = netNeeded;
+        let high = netNeeded * 4; 
+        let gross = netNeeded;
+        let base_tax = getTotalTax(baseIncome, ss_benefit);
+        
+        for(let i=0; i<40; i++) {
+            gross = (low + high) / 2;
+            let current_tax = getTotalTax(baseIncome + gross, ss_benefit);
+            let tax = current_tax - base_tax;
+            let penalty = gross * penaltyRate;
+            let net = gross - tax - penalty;
+            
+            if (net < netNeeded) low = gross;
+            else high = gross;
+        }
+        return gross;
+    }
+
+    function runSimulation() {
+        const startAge = parseInt(document.getElementById('startAge').value);
+        const lifeExpectancy = parseInt(document.getElementById('lifeExpectancy').value);
+        const stopHighAge = parseInt(document.getElementById('stopHighAge').value);
+        const fullRetireAge = parseInt(document.getElementById('fullRetireAge').value);
+        const coastIncome = parseFloat(document.getElementById('coastIncome').value);
+        const targetConv = parseFloat(document.getElementById('targetConv').value);
+        const stopConvAge = parseInt(document.getElementById('stopConvAge').value);
+        const spendHigh = parseFloat(document.getElementById('spendHigh').value);
+        const spendLow = parseFloat(document.getElementById('spendLow').value);
+        const rate = parseFloat(document.getElementById('rate').value);
+        const useRuleOf55 = document.getElementById('ruleOf55').checked;
+        
+        const pensionInflow = parseFloat(document.getElementById('pensionInflow').value) || 0;
+        const pensionAge = parseInt(document.getElementById('pensionAge').value);
+        const ssIncome = parseFloat(document.getElementById('ssIncome').value) || 0;
+        const ssAge = parseInt(document.getElementById('ssAge').value);
+
+        let trad = parseFloat(document.getElementById('initTrad').value);
+        let roth_cont = parseFloat(document.getElementById('initRoth').value);
+        let brokerage = parseFloat(document.getElementById('initBrok').value);
+        
+        let roth_convs = {};
+        let roth_earnings = 0;
+        const currentYear = new Date().getFullYear();
+        const tbody = document.querySelector('#resultsTable tbody');
+        tbody.innerHTML = '';
+
+        for (let age = startAge; age <= lifeExpectancy; age++) {
+            let year = currentYear + (age - startAge);
+            let isRothPenaltyAge = age < 60; 
+            let isTradPenaltyAge = (age < 60 && !(useRuleOf55 && age >= 55));
+            
+            if (age === pensionAge && pensionInflow > 0) {
+                trad += pensionInflow;
+            }
+
+            let start_trad = trad;
+            let start_roth_total = roth_cont + Object.values(roth_convs).reduce((a,b) => a+b, 0) + roth_earnings;
+            let start_brok = brokerage;
+            let start_total = start_trad + start_roth_total + start_brok;
+            
+            let phase = "", conversion_amt = 0, rmd_amt = 0, brok_drawn = 0, roth_drawn = 0, trad_drawn_standard = 0, penalty_paid = 0;
+            let spend = age < 55 ? spendHigh : spendLow;
+            let current_ordinary_income = 0;
+            
+            if (age < stopHighAge) {
+                phase = "High Income";
+                trad = trad * (1 + rate) + parseFloat(document.getElementById('cont401k').value);
+                roth_earnings = roth_earnings * (1 + rate) + (roth_cont * rate);
+                roth_cont += parseFloat(document.getElementById('contRoth').value);
+                brokerage = brokerage * (1 + rate) + parseFloat(document.getElementById('contBrok').value) + getRsuTa(year);
+                
+                let swr = (start_total > 0) ? ((spend / start_total) * 100).toFixed(2) + '%' : '0.00%';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${age}</td><td>${phase}</td><td>${formatCurrency(start_trad)}</td><td>${formatCurrency(start_roth_total)}</td><td>${formatCurrency(start_brok)}</td><td><b>${formatCurrency(start_total)}</b></td><td>${swr}</td><td>$0</td><td>$0</td><td>$0</td><td>$0</td><td>$0</td><td>$0</td><td>$0</td>`;
+                tbody.appendChild(tr);
+                continue;
+            } else {
+                let job_income = (age < fullRetireAge) ? coastIncome : 0;
+                let social_security = (age >= ssAge) ? ssIncome : 0;
+                
+                phase = (age < fullRetireAge) ? "Coast/Barista" : "Full Retirement";
+                
+                current_ordinary_income = job_income;
+                let base_tax = getTotalTax(current_ordinary_income, social_security);
+                
+                let living_draw = Math.max(0, spend - (job_income + social_security));
+                let cash_needed = living_draw + base_tax;
+
+                // 1. RMD Execution Phase
+                if (age >= 75 && ultFactors[age]) {
+                    rmd_amt = Math.min(trad, start_trad / ultFactors[age]);
+                    trad -= rmd_amt;
+                    let tax_on_rmd = getTotalTax(current_ordinary_income + rmd_amt, social_security) - getTotalTax(current_ordinary_income, social_security);
+                    current_ordinary_income += rmd_amt;
+                    let net_rmd = rmd_amt - tax_on_rmd;
+                    
+                    if (net_rmd >= cash_needed) { 
+                        brokerage += (net_rmd - cash_needed); 
+                        cash_needed = 0; 
+                    } else { 
+                        cash_needed -= net_rmd; 
+                    }
+                }
+
+                // 2. Roth Conversion Phase
+                if (age < stopConvAge && targetConv > 0) {
+                    conversion_amt = Math.min(targetConv, trad);
+                    trad -= conversion_amt;
+                    roth_convs[age] = conversion_amt;
+                    cash_needed += (getTotalTax(current_ordinary_income + conversion_amt, social_security) - getTotalTax(current_ordinary_income, social_security));
+                    current_ordinary_income += conversion_amt;
+                }
+
+                // 3. Drawdown Sequence Matrix
+                if (brokerage >= cash_needed) { brok_drawn = cash_needed; brokerage -= cash_needed; cash_needed = 0; }
+                else { brok_drawn = brokerage; cash_needed -= brokerage; brokerage = 0; }
+
+                if (!isTradPenaltyAge && cash_needed > 0) {
+                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0);
+                    trad_drawn_standard += gross; trad -= gross; current_ordinary_income += gross; cash_needed = 0;
+                }
+
+                if (cash_needed > 0 && roth_cont >= cash_needed) { roth_drawn += cash_needed; roth_cont -= cash_needed; cash_needed = 0; }
+                else if (cash_needed > 0) { roth_drawn += roth_cont; cash_needed -= roth_cont; roth_cont = 0; }
+
+                let matured = Object.keys(roth_convs).filter(a => a <= age - 5);
+                for (let a of matured) {
+                    if (cash_needed <= 0) break;
+                    let draw = Math.min(cash_needed, roth_convs[a]);
+                    roth_drawn += draw; roth_convs[a] -= draw; cash_needed -= draw;
+                }
+
+                if (cash_needed > 0) {
+                    let penaltyRate = isRothPenaltyAge ? 0.10 : 0;
+                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, penaltyRate);
+                    roth_earnings -= gross; roth_drawn += gross; penalty_paid += (gross * penaltyRate); current_ordinary_income += gross; cash_needed = 0;
+                }
+                
+                if (cash_needed > 0 && isTradPenaltyAge) {
+                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0.10);
+                    trad_drawn_standard += gross; trad -= gross; penalty_paid += (gross * 0.10); current_ordinary_income += gross; cash_needed = 0;
+                }
+
+                trad *= (1 + rate); brokerage *= (1 + rate);
+                let roth_total_pre = roth_cont + Object.values(roth_convs).reduce((a,b) => a+b, 0) + roth_earnings;
+                roth_earnings += roth_total_pre * rate;
+            }
+            
+            let swr = (start_total > 0) ? ((spend / start_total) * 100).toFixed(2) + '%' : '0.00%';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${age}</td>
+                <td>${phase}</td>
+                <td>${formatCurrency(start_trad)}</td>
+                <td>${formatCurrency(start_roth_total)}</td>
+                <td>${formatCurrency(start_brok)}</td>
+                <td><strong>${formatCurrency(start_total)}</strong></td>
+                <td class="${start_total > 0 && (spend/start_total) > 0.04 ? 'negative' : ''}"><strong>${swr}</strong></td>
+                <td>${formatCurrency(age >= ssAge ? ssIncome : 0)}</td>
+                <td>${formatCurrency(conversion_amt)}</td>
+                <td>${formatCurrency(brok_drawn)}</td>
+                <td>${formatCurrency(trad_drawn_standard + rmd_amt)}</td>
+                <td>${formatCurrency(roth_drawn)}</td>
+                <td>${formatCurrency(getTotalTax(current_ordinary_income, (age >= ssAge ? ssIncome : 0)))}</td>
+                <td class="${penalty_paid > 0 ? 'negative' : ''}">${formatCurrency(penalty_paid)}</td>
+            `;
+            tbody.appendChild(tr);
+            
+            for (let k in roth_convs) if (roth_convs[k] <= 0) delete roth_convs[k];
+        }
+    }
+    window.onload = runSimulation;
+</script>
+</body>
+</html>
