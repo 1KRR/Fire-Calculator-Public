@@ -139,7 +139,30 @@
         </table>
     </div>
 </div>
+<div class="panel" style="margin-top: 20px; max-width: 1900px; width: 100%;">
+    <h2 style="font-size: 1.2rem; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Technical Specifications & Assumptions</h2>
+    
+    <div style="font-size: 0.85rem; line-height: 1.5; color: #444;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: #111;">1. Social Security & The "Tax Torpedo"</h3>
+        <p style="margin-top: 0;">Social Security benefits are not treated as 100% taxable. The calculator uses the IRS "Combined Income" formula (Adjusted Gross Income + 50% of your Social Security benefit). Based on 2026 Married Filing Jointly thresholds, it dynamically calculates the taxable portion, capping it at the statutory maximum of 85%. This accurately models how portfolio withdrawals increase the taxability of your benefits.</p>
 
+        <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: #111;">2. 2026 Progressive Tax Framework</h3>
+        <p style="margin-top: 0;">The engine utilizes the exact 2026 Married Filing Jointly (MFJ) progressive federal tax schedule. A base standard deduction of $32,200 is automatically applied. Income exceeding this deduction passes sequentially through the 10%, 12%, 22%, and 24%+ marginal brackets. State taxes are isolated; the tool assumes a state profile (like Illinois) where qualified retirement distributions are structurally exempt from state income tax.</p>
+
+        <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: #111;">3. Drawdown Waterfall Hierarchy</h3>
+        <p style="margin-top: 0;">The liquidation matrix shifts dynamically based on IRS penalty thresholds to optimize tax efficiency:</p>
+        <ul style="margin-top: 0;">
+            <li><strong>Pre-Age 60 (Bridge Phase):</strong> Taxable Brokerage (0% LTCG) &rarr; Roth Contributions (Penalty-Free) &rarr; Matured Roth Conversions &rarr; Traditional IRA (Incurs ordinary income tax + 10% penalty).</li>
+            <li><strong>Age 60+ (Standard Retirement):</strong> Taxable Brokerage &rarr; Traditional IRA (Drawn down first to mitigate the "RMD Tax Bomb" at age 75) &rarr; Roth IRA (Held last for maximum tax-free compounding).</li>
+        </ul>
+
+        <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: #111;">4. Required Safe Withdrawal Rate (SWR)</h3>
+        <p style="margin-top: 0;">This column tracks the exact percentage of your total net worth required to sustain your lifestyle plus cover all federal tax obligations for that specific year. If this combined capital requirement exceeds the baseline 4.0% safe withdrawal threshold, the value highlights in bold red to indicate elevated portfolio depletion risk.</p>
+
+        <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: #111;">5. Custom Asset Inflows & RMDs</h3>
+        <p style="margin-top: 0;">The "Pension Asset Inflow" executes as a one-time lump-sum capital injection directly into your Traditional/401(k) balance at your specified target age. Required Minimum Distributions (RMDs) comply with SECURE Act 2.0, deferred entirely until age 75, at which point they are calculated using official IRS Uniform Lifetime Table factors.</p>
+    </div>
+</div>
 <script>
     const ultFactors = { 
         75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 
