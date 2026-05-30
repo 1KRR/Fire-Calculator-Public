@@ -134,8 +134,7 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Populated by JS -->
-            </tbody>
+                </tbody>
         </table>
     </div>
 </div>
@@ -170,14 +169,6 @@
         87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 
         93: 10.1, 94: 9.5 
     };
-
-    function getRsuTa(year) {
-        let extra = 0;
-        if (year === 2026) extra += 53 * 115;
-        if (year === 2027) extra += (53 * 115) + 15000;
-        if (year === 2028) extra += 53 * 115;
-        return extra;
-    }
 
     function formatCurrency(num) {
         return Math.round(num).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -301,7 +292,9 @@
                 trad = trad * (1 + rate) + parseFloat(document.getElementById('cont401k').value);
                 roth_earnings = roth_earnings * (1 + rate) + (roth_cont * rate);
                 roth_cont += parseFloat(document.getElementById('contRoth').value);
-                brokerage = brokerage * (1 + rate) + parseFloat(document.getElementById('contBrok').value) + getRsuTa(year);
+                
+                // RSU bonus addition removed from the line below
+                brokerage = brokerage * (1 + rate) + parseFloat(document.getElementById('contBrok').value);
                 
                 let swr = (start_total > 0) ? ((spend / start_total) * 100).toFixed(2) + '%' : '0.00%';
                 const tr = document.createElement('tr');
