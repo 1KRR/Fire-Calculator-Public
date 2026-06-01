@@ -138,6 +138,7 @@
         </table>
     </div>
 </div>
+
 <div class="panel" style="margin-top: 20px; max-width: 1900px; width: 100%;">
     <h2 style="font-size: 1.2rem; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Technical Specifications & Assumptions</h2>
     
@@ -162,6 +163,7 @@
         <p style="margin-top: 0;">The "Pension Asset Inflow" executes as a one-time lump-sum capital injection directly into your Traditional/401(k) balance at your specified target age. Required Minimum Distributions (RMDs) comply with SECURE Act 2.0, deferred entirely until age 75, at which point they are calculated using official IRS Uniform Lifetime Table factors.</p>
     </div>
 </div>
+
 <script>
     const ultFactors = { 
         75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 
@@ -174,7 +176,6 @@
         return Math.round(num).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
     }
 
-    // Standard progressive tax without SS combined logic
     function calculateTax(income) {
         let taxable = Math.max(0, income - 32200); 
         let tax = 0;
@@ -200,7 +201,6 @@
         return tax;
     }
 
-    // Calculates taxable portion of SS based on AGI
     function getTaxableSS(ordinary_income, ss_benefit) {
         if (ss_benefit <= 0) return 0;
         let combined_income = ordinary_income + (0.5 * ss_benefit);
@@ -215,7 +215,6 @@
         return Math.min(taxable_ss, 0.85 * ss_benefit);
     }
 
-    // Merges ordinary AGI and taxable SS
     function getTotalTax(ordinary_income, ss_benefit) {
         let taxable_ss = getTaxableSS(ordinary_income, ss_benefit);
         return calculateTax(ordinary_income + taxable_ss);
@@ -292,8 +291,6 @@
                 trad = trad * (1 + rate) + parseFloat(document.getElementById('cont401k').value);
                 roth_earnings = roth_earnings * (1 + rate) + (roth_cont * rate);
                 roth_cont += parseFloat(document.getElementById('contRoth').value);
-                
-                // RSU bonus addition removed from the line below
                 brokerage = brokerage * (1 + rate) + parseFloat(document.getElementById('contBrok').value);
                 
                 let swr = (start_total > 0) ? ((spend / start_total) * 100).toFixed(2) + '%' : '0.00%';
@@ -314,7 +311,7 @@
                 let cash_needed = living_draw + base_tax;
 
                 // 1. RMD Execution Phase
-                if (age >= 75 && ultFactors[age]) {
+                if (age >= 75 && ultFactors[age] && trad > 0) {
                     rmd_amt = Math.min(trad, start_trad / ultFactors[age]);
                     trad -= rmd_amt;
                     let tax_on_rmd = getTotalTax(current_ordinary_income + rmd_amt, social_security) - getTotalTax(current_ordinary_income, social_security);
@@ -322,15 +319,14 @@
                     let net_rmd = rmd_amt - tax_on_rmd;
                     
                     if (net_rmd >= cash_needed) { 
-                        brokerage += (net_rmd - cash_needed); 
                         cash_needed = 0; 
                     } else { 
-                        cash_needed -= net_rmd; 
+                        cash_needed -= Math.max(0, net_rmd); 
                     }
                 }
 
                 // 2. Roth Conversion Phase
-                if (age < stopConvAge && targetConv > 0) {
+                if (age < stopConvAge && targetConv > 0 && trad > 0) {
                     conversion_amt = Math.min(targetConv, trad);
                     trad -= conversion_amt;
                     roth_convs[age] = conversion_amt;
@@ -339,17 +335,29 @@
                 }
 
                 // 3. Drawdown Sequence Matrix
+                
+                // A: Brokerage Drawdown
                 if (brokerage >= cash_needed) { brok_drawn = cash_needed; brokerage -= cash_needed; cash_needed = 0; }
                 else { brok_drawn = brokerage; cash_needed -= brokerage; brokerage = 0; }
 
-                if (!isTradPenaltyAge && cash_needed > 0) {
-                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0);
-                    trad_drawn_standard += gross; trad -= gross; current_ordinary_income += gross; cash_needed = 0;
+                // B: Traditional IRA Standard Drawdown (Penalty-Free)
+                if (!isTradPenaltyAge && cash_needed > 0 && trad > 0) {
+                    let max_tax = getTotalTax(current_ordinary_income + trad, social_security) - getTotalTax(current_ordinary_income, social_security);
+                    let max_net = trad - max_tax;
+                    
+                    if (max_net >= cash_needed) {
+                        let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0);
+                        trad_drawn_standard += gross; trad -= gross; current_ordinary_income += gross; cash_needed = 0;
+                    } else {
+                        trad_drawn_standard += trad; current_ordinary_income += trad; cash_needed -= Math.max(0, max_net); trad = 0;
+                    }
                 }
 
+                // C: Roth Contributions
                 if (cash_needed > 0 && roth_cont >= cash_needed) { roth_drawn += cash_needed; roth_cont -= cash_needed; cash_needed = 0; }
-                else if (cash_needed > 0) { roth_drawn += roth_cont; cash_needed -= roth_cont; roth_cont = 0; }
+                else if (cash_needed > 0 && roth_cont > 0) { roth_drawn += roth_cont; cash_needed -= roth_cont; roth_cont = 0; }
 
+                // D: Matured Roth Conversions
                 let matured = Object.keys(roth_convs).filter(a => a <= age - 5);
                 for (let a of matured) {
                     if (cash_needed <= 0) break;
@@ -357,20 +365,45 @@
                     roth_drawn += draw; roth_convs[a] -= draw; cash_needed -= draw;
                 }
 
-                if (cash_needed > 0) {
+                // E: Roth Earnings (Taxable/Penalty Risk)
+                if (cash_needed > 0 && roth_earnings > 0) {
                     let penaltyRate = isRothPenaltyAge ? 0.10 : 0;
-                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, penaltyRate);
-                    roth_earnings -= gross; roth_drawn += gross; penalty_paid += (gross * penaltyRate); current_ordinary_income += gross; cash_needed = 0;
+                    let max_tax = isRothPenaltyAge ? (getTotalTax(current_ordinary_income + roth_earnings, social_security) - getTotalTax(current_ordinary_income, social_security)) : 0;
+                    let max_pen = roth_earnings * penaltyRate;
+                    let max_net = roth_earnings - max_tax - max_pen;
+                    
+                    if (max_net >= cash_needed) {
+                        let gross = isRothPenaltyAge ? getGrossDraw(current_ordinary_income, social_security, cash_needed, penaltyRate) : cash_needed;
+                        roth_earnings -= gross; roth_drawn += gross; penalty_paid += (gross * penaltyRate); 
+                        if (isRothPenaltyAge) current_ordinary_income += gross; 
+                        cash_needed = 0;
+                    } else {
+                        roth_drawn += roth_earnings; penalty_paid += max_pen; 
+                        if (isRothPenaltyAge) current_ordinary_income += roth_earnings; 
+                        cash_needed -= Math.max(0, max_net); roth_earnings = 0;
+                    }
                 }
                 
-                if (cash_needed > 0 && isTradPenaltyAge) {
-                    let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0.10);
-                    trad_drawn_standard += gross; trad -= gross; penalty_paid += (gross * 0.10); current_ordinary_income += gross; cash_needed = 0;
+                // F: Traditional IRA Early Drawdown (Penalty Phase)
+                if (cash_needed > 0 && isTradPenaltyAge && trad > 0) {
+                    let max_tax = getTotalTax(current_ordinary_income + trad, social_security) - getTotalTax(current_ordinary_income, social_security);
+                    let max_pen = trad * 0.10;
+                    let max_net = trad - max_tax - max_pen;
+                    
+                    if (max_net >= cash_needed) {
+                        let gross = getGrossDraw(current_ordinary_income, social_security, cash_needed, 0.10);
+                        trad_drawn_standard += gross; trad -= gross; penalty_paid += (gross * 0.10); current_ordinary_income += gross; cash_needed = 0;
+                    } else {
+                        trad_drawn_standard += trad; penalty_paid += max_pen; current_ordinary_income += trad; cash_needed -= Math.max(0, max_net); trad = 0;
+                    }
                 }
 
-                trad *= (1 + rate); brokerage *= (1 + rate);
+                // Apply End-of-Year Market Growth
+                if (trad > 0) trad *= (1 + rate); 
+                if (brokerage > 0) brokerage *= (1 + rate);
+                
                 let roth_total_pre = roth_cont + Object.values(roth_convs).reduce((a,b) => a+b, 0) + roth_earnings;
-                roth_earnings += roth_total_pre * rate;
+                if (roth_total_pre > 0) roth_earnings += roth_total_pre * rate;
             }
             
             let swr = (start_total > 0) ? ((spend / start_total) * 100).toFixed(2) + '%' : '0.00%';
